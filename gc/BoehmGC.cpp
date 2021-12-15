@@ -64,7 +64,7 @@ GC_ms_entry* GC_gcj_vector_proc(GC_word* addr, GC_ms_entry* mark_stack_ptr,
     GC_descr element_desc = (GC_descr)element_type->gc_desc;
 
     IL2CPP_ASSERT((element_desc & GC_DS_TAGS) == GC_DS_BITMAP);
-    IL2CPP_ASSERT(element_type->valuetype);
+    IL2CPP_ASSERT(element_type->byval_arg.valuetype);
 
     int words_per_element = array_type->element_size / BYTES_PER_WORD;
     GC_word* actual_start = (GC_word*)a->vector;
@@ -355,15 +355,7 @@ il2cpp::gc::GarbageCollector::MakeDescriptorForObject(size_t *bitmap, int numbit
     if (numbits >= 30)
         return GC_NO_DESCRIPTOR;
     else
-    {
-        GC_descr desc = GC_make_descriptor((GC_bitmap)bitmap, numbits);
-        // we should always have a GC_DS_BITMAP descriptor, as we:
-        // 1) Always want a precise marker.
-        // 2) Can never be GC_DS_LENGTH since we always have an object header
-        //    at the beginning of the allocation.
-        IL2CPP_ASSERT((desc & GC_DS_TAGS) == GC_DS_BITMAP || (desc & GC_DS_TAGS) == (GC_descr)GC_NO_DESCRIPTOR);
-        return (void*)desc;
-    }
+        return (void*)GC_make_descriptor((GC_bitmap)bitmap, numbits);
 #else
     return 0;
 #endif

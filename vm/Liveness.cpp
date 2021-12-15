@@ -300,7 +300,7 @@ namespace vm
             return;
 
         array_length = Array::GetLength(array);
-        if (element_class->valuetype)
+        if (element_class->byval_arg.valuetype)
         {
             size_t items_processed = 0;
             elementClassSize = Class::GetArrayElementSize(element_class);

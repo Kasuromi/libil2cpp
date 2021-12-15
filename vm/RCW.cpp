@@ -200,7 +200,7 @@ namespace vm
                 Exception::Raise(exception);
 
             // Set the field in our reboxed key value pair instance
-            if (Class::FromIl2CppType(field.type)->valuetype)
+            if (Class::FromIl2CppType(field.type)->byval_arg.valuetype)
             {
                 Field::SetValue(reboxed, &field, Object::Unbox(fieldValue));
             }

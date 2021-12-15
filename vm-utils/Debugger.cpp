@@ -255,6 +255,7 @@ namespace utils
     void Debugger::StartDebuggerThread()
     {
 #if defined(RUNTIME_IL2CPP)
+        // This thread is allocated here once and never deallocated.
         s_DebuggerThread = new os::Thread();
         s_DebuggerThread->Run(mono_debugger_run_debugger_thread_func, NULL);
 #else
@@ -733,6 +734,17 @@ namespace utils
                 Il2CppStackFrameInfo frameInfo = { 0 };
                 frameInfo.method = method;
                 frameInfo.raw_ip = (uintptr_t)method->methodPointer;
+                if (unwindState->executionContexts[i]->currentSequencePoint != NULL)
+                {
+                    const Il2CppDebuggerMetadataRegistration* debuggerMetadata = method->klass->image->codeGenModule->debuggerMetadata;
+                    if (debuggerMetadata != NULL)
+                    {
+                        int32_t sourceFileIndex = unwindState->executionContexts[i]->currentSequencePoint->sourceFileIndex;
+                        frameInfo.filePath = debuggerMetadata->sequencePointSourceFiles[sourceFileIndex].file;
+                        frameInfo.sourceCodeLineNumber = unwindState->executionContexts[i]->currentSequencePoint->lineStart;
+                        frameInfo.ilOffset = unwindState->executionContexts[i]->currentSequencePoint->ilOffset;
+                    }
+                }
                 stackFrames->push_back(frameInfo);
             }
         }

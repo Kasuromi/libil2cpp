@@ -156,7 +156,7 @@ namespace metadata
         while (elementClass != NULL)
         {
             interfaces.push_back(elementClass);
-            if (!elementClass->valuetype && elementClass != il2cpp_defaults.value_type_class && elementClass != il2cpp_defaults.enum_class)
+            if (!elementClass->byval_arg.valuetype && elementClass != il2cpp_defaults.value_type_class && elementClass != il2cpp_defaults.enum_class)
             {
                 void* iter = NULL;
                 while (Il2CppClass* itf = Class::GetInterfaces(elementClass, &iter))
@@ -183,7 +183,7 @@ namespace metadata
             }
 
             elementClass = Class::GetParent(elementClass);
-            if (elementClass != NULL && (elementClass->valuetype || elementClass == il2cpp_defaults.value_type_class || elementClass == il2cpp_defaults.enum_class))
+            if (elementClass != NULL && (elementClass->byval_arg.valuetype || elementClass == il2cpp_defaults.value_type_class || elementClass == il2cpp_defaults.enum_class))
                 break;
         }
     }
@@ -541,6 +541,7 @@ namespace metadata
         klass->rank = rank;
 
         klass->instance_size = Class::GetInstanceSize(arrayClass);
+        klass->size_inited = true;
         klass->vtable_count = static_cast<uint16_t>(slots);
 
         // need this before we access the size or has_references
@@ -550,8 +551,6 @@ namespace metadata
         klass->native_size = klass->thread_static_fields_offset = -1;
 
         klass->has_references = Type::IsReference(&elementClass->byval_arg) || elementClass->has_references;
-
-        klass->size_inited = true; // set only after instance_size and has_references are set
 
         klass->element_class = elementClass;
 

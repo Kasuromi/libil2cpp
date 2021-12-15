@@ -129,7 +129,7 @@ typedef void (STDCALL *SynchronizationContextCallback)(intptr_t arg);
 #endif
 
 #if IL2CPP_TINY
-    #if IL2CPP_TINY_DEBUG_METADATA
+    #if IL2CPP_TINY_DEBUG_METADATA || IL2CPP_TINY_DEBUGGER
         #define IL2CPP_ENABLE_STACKTRACES 1
     #else
         #define IL2CPP_ENABLE_STACKTRACES 0

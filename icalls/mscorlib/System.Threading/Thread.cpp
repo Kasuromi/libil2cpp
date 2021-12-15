@@ -119,11 +119,6 @@ namespace Threading
         ClrState(thread, vm::kThreadStateWaitSleepJoin);
     }
 
-    void Thread::Thread_init(Il2CppThread * thisPtr)
-    {
-        il2cpp::vm::Thread::Setup(thisPtr);
-    }
-
     struct StartData
     {
         Il2CppThread* m_Thread;
@@ -146,7 +141,7 @@ namespace Threading
 
             il2cpp::vm::StackTrace::InitializeStackTracesForCurrentThread();
 
-            il2cpp::vm::Thread::Initialize(startData->m_Thread, startData->m_Domain);
+            il2cpp::vm::Thread::InitializeManagedThread(startData->m_Thread, startData->m_Domain);
             il2cpp::vm::Thread::SetState(startData->m_Thread, vm::kThreadStateRunning);
 
             try
@@ -166,7 +161,7 @@ namespace Threading
 
             il2cpp::vm::Thread::ClrState(startData->m_Thread, vm::kThreadStateRunning);
             il2cpp::vm::Thread::SetState(startData->m_Thread, vm::kThreadStateStopped);
-            il2cpp::vm::Thread::Uninitialize(startData->m_Thread);
+            il2cpp::vm::Thread::UninitializeManagedThread(startData->m_Thread);
 
             il2cpp::vm::StackTrace::CleanupStackTracesForCurrentThread();
         }
@@ -510,13 +505,6 @@ namespace Threading
 
     int32_t Thread::GetState40(Il2CppInternalThread* thread)
     {
-        // There is a chance that the managed thread object can be used from code (like a
-        // finalizer) after it has been destroyed. In that case, the objects that
-        // the runtime uses to track this thread may have been freed. Try to check for
-        // that case here and return early.
-        if (thread == NULL || thread->synch_cs == NULL)
-            return vm::kThreadStateStopped;
-
         il2cpp::os::FastAutoLock lock(thread->synch_cs);
         return (il2cpp::vm::ThreadState)thread->state;
     }
@@ -533,19 +521,10 @@ namespace Threading
 
     void Thread::ConstructInternalThread(Il2CppThread* _this)
     {
-        os::Thread* osThread = new os::Thread();
-
-        // Create managed object representing the current thread.
-
-        Il2CppInternalThread* internal = (Il2CppInternalThread*)vm::Object::New(il2cpp_defaults.internal_thread_class);
-        internal->state = vm::kThreadStateUnstarted;
-        internal->handle = osThread;
-        internal->tid = osThread->Id();
-        internal->synch_cs = new baselib::ReentrantLock;
-        internal->apartment_state = il2cpp::os::kApartmentStateUnknown;
-        internal->managed_id = GetNewManagedId_internal();
-        os::Atomic::CompareExchangePointer<Il2CppInternalThread>(&_this->internal_thread, internal, NULL);
-        il2cpp::gc::GarbageCollector::SetWriteBarrier((void**)&_this->internal_thread);
+        // The os::Thread object is deallocated in the InternalThread::Thread_free_internal icall, which
+        // is called from the managed thread finalizer.
+        vm::Thread::SetupInternalManagedThread(_this, new os::Thread());
+        _this->GetInternalThread()->state = vm::kThreadStateUnstarted;
     }
 
     void Thread::GetStackTraces(Il2CppArray** threads, Il2CppArray** stack_frames)

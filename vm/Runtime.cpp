@@ -27,7 +27,6 @@
 #include "vm/Reflection.h"
 #include "vm/Runtime.h"
 #include "vm/Thread.h"
-#include "vm/ThreadPool.h"
 #include "vm/Type.h"
 #include "vm/String.h"
 #include "vm/Object.h"
@@ -89,13 +88,13 @@ namespace vm
     IL2CPP_ASSERT(il2cpp_defaults.field); } while (0)
 
 #define DEFAULTS_INIT_TYPE(field, ns, n, nativetype) do { DEFAULTS_INIT(field, ns, n); \
-    IL2CPP_ASSERT(il2cpp_defaults.field->instance_size == sizeof(nativetype) + (il2cpp_defaults.field->valuetype ? sizeof(Il2CppObject) : 0)); } while (0)
+    IL2CPP_ASSERT(il2cpp_defaults.field->instance_size == sizeof(nativetype) + (il2cpp_defaults.field->byval_arg.valuetype ? sizeof(Il2CppObject) : 0)); } while (0)
 
 #define DEFAULTS_INIT_OPTIONAL(field, ns, n) do { il2cpp_defaults.field = Class::FromName (il2cpp_defaults.corlib, ns, n); } while (0)
 
 #define DEFAULTS_INIT_TYPE_OPTIONAL(field, ns, n, nativetype) do { DEFAULTS_INIT_OPTIONAL(field, ns, n); \
     if (il2cpp_defaults.field != NULL) \
-        IL2CPP_ASSERT(il2cpp_defaults.field->instance_size == sizeof(nativetype) + (il2cpp_defaults.field->valuetype ? sizeof(Il2CppObject) : 0)); } while (0)
+        IL2CPP_ASSERT(il2cpp_defaults.field->instance_size == sizeof(nativetype) + (il2cpp_defaults.field->byval_arg.valuetype ? sizeof(Il2CppObject) : 0)); } while (0)
 
     char* basepath(const char* path)
     {
@@ -560,12 +559,10 @@ namespace vm
         // in every invoke call as that blows up the code size.
         try
         {
-            RaiseExecutionEngineExceptionIfMethodIsNotFound(method);
-
-            if (!Method::IsInstance(method) && method->klass && method->klass->has_cctor && !method->klass->cctor_finished)
+            if ((method->flags & METHOD_ATTRIBUTE_STATIC) && method->klass && method->klass->has_cctor && !method->klass->cctor_finished)
                 ClassInit(method->klass);
 
-            return (Il2CppObject*)method->invoker_method(method->methodPointer, method, obj, params);
+            return InvokeWithThrow(method, obj, params);
         }
         catch (Il2CppExceptionWrapper& ex)
         {
@@ -577,8 +574,28 @@ namespace vm
 
     Il2CppObject* Runtime::InvokeWithThrow(const MethodInfo *method, void *obj, void **params)
     {
-        RaiseExecutionEngineExceptionIfMethodIsNotFound(method);
-        return (Il2CppObject*)method->invoker_method(method->methodPointer, method, obj, params);
+        if (method->return_type->type == IL2CPP_TYPE_VOID)
+        {
+            method->invoker_method(method->methodPointer, method, obj, params, NULL);
+            return NULL;
+        }
+        else
+        {
+            if (method->return_type->valuetype)
+            {
+                Il2CppClass* returnType = Class::FromIl2CppType(method->return_type);
+                Class::Init(returnType);
+                void* returnValue = alloca(returnType->instance_size - sizeof(Il2CppObject));
+                method->invoker_method(method->methodPointer, method, obj, params, returnValue);
+                return Object::Box(returnType, returnValue);
+            }
+            else
+            {
+                Il2CppObject* returnValue = NULL;
+                method->invoker_method(method->methodPointer, method, obj, params, &returnValue);
+                return returnValue;
+            }
+        }
     }
 
     Il2CppObject* Runtime::InvokeArray(const MethodInfo *method, void *obj, Il2CppArray *params, Il2CppException **exc)
@@ -603,7 +620,7 @@ namespace vm
         method = Class::GetMethodFromName(klass, ".ctor", 0);
         IL2CPP_ASSERT(method != NULL && "ObjectInit; no default constructor for object is found");
 
-        if (method->klass->valuetype)
+        if (method->klass->byval_arg.valuetype)
             object = (Il2CppObject*)Object::Unbox(object);
         Invoke(method, object, NULL, exc);
     }
@@ -713,7 +730,7 @@ namespace vm
                 Il2CppClass* parameterType = Class::FromIl2CppType(method->parameters[i].parameter_type);
                 Class::Init(parameterType);
 
-                if (parameterType->valuetype)
+                if (parameterType->byval_arg.valuetype)
                 {
                     if (Class::IsNullable(parameterType))
                     {
@@ -952,6 +969,16 @@ namespace vm
     void Runtime::SetExitCode(int32_t value)
     {
         exitcode = value;
+    }
+
+    static void MissingMethodInvoker(Il2CppMethodPointer ptr, const MethodInfo* method, void* obj, void** args, void* ret)
+    {
+        Runtime::AlwaysRaiseExecutionEngineException(method);
+    }
+
+    InvokerMethod Runtime::GetMissingMethodInvoker()
+    {
+        return MissingMethodInvoker;
     }
 } /* namespace vm */
 } /* namespace il2cpp */

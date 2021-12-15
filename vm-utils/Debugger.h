@@ -174,6 +174,7 @@ namespace utils
         // The context parameter here is really il2cpp::vm::StackFrames*. We don't want to include vm/StackTrace.h in this file,
         // as this one is included in generated code.
         static void GetStackFrames(void* context);
+
     private:
         static os::ThreadLocalValue s_IsGlobalBreakpointActive;
         static void InitializeMethodToSequencePointMap();
