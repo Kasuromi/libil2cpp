@@ -19,7 +19,6 @@
 #include "vm/StackTrace.h"
 #include "utils/Memory.h"
 #include "utils/StringUtils.h"
-#include "vm/Atomic.h"
 
 using il2cpp::gc::GarbageCollector;
 
@@ -511,13 +510,6 @@ namespace Threading
 
     int32_t Thread::GetState40(Il2CppInternalThread* thread)
     {
-        // There is a chance that the managed thread object can be used from code (like a
-        // finalizer) after it has been destroyed. In that case, the objects that
-        // the runtime uses to track this thread may have been freed. Try to check for
-        // that case here and return early.
-        if (thread == NULL || thread->synch_cs == NULL)
-            return vm::kThreadStateStopped;
-
         il2cpp::os::FastAutoLock lock(thread->synch_cs);
         return (il2cpp::vm::ThreadState)thread->state;
     }
@@ -542,10 +534,10 @@ namespace Threading
         internal->state = vm::kThreadStateUnstarted;
         internal->handle = osThread;
         internal->tid = osThread->Id();
-        internal->synch_cs = new il2cpp::os::FastMutex();
+        internal->synch_cs = new baselib::ReentrantLock;
         internal->apartment_state = il2cpp::os::kApartmentStateUnknown;
         internal->managed_id = GetNewManagedId_internal();
-        vm::Atomic::CompareExchangePointer<Il2CppInternalThread>(&_this->internal_thread, internal, NULL);
+        os::Atomic::CompareExchangePointer<Il2CppInternalThread>(&_this->internal_thread, internal, NULL);
         il2cpp::gc::GarbageCollector::SetWriteBarrier((void**)&_this->internal_thread);
     }
 
